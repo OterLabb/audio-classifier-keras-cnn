@@ -8,14 +8,17 @@ import librosa
 import librosa.display
 import os
 
-def get_class_names(path="Samples/"):  # class names are subdirectory names in Samples/ directory
+#Added a ROOT folder for easier testing
+ROOT = "D:/BIRDS_SOUNDS/"
+
+def get_class_names(path=ROOT + "Samples/"):  # class names are subdirectory names in Samples/ directory
     class_names = os.listdir(path)
     return class_names
 
-def preprocess_dataset(inpath="Samples/", outpath="Preproc/"):
+def preprocess_dataset(inpath=ROOT + "Samples/", outpath=ROOT + "Preproc/"):
 
     if not os.path.exists(outpath):
-        os.mkdir( outpath, 0755 );   # make a new directory for preproc'd files
+        os.mkdir( outpath );   # make a new directory for preproc'd files
 
     class_names = get_class_names(path=inpath)   # get the names of the subdirectories
     nb_classes = len(class_names)
@@ -23,7 +26,7 @@ def preprocess_dataset(inpath="Samples/", outpath="Preproc/"):
     for idx, classname in enumerate(class_names):   # go through the subdirs
 
         if not os.path.exists(outpath+classname):
-            os.mkdir( outpath+classname, 0755 );   # make a new subdirectory for preproc class
+            os.mkdir( outpath+classname );   # make a new subdirectory for preproc class
 
         class_files = os.listdir(inpath+classname)
         n_files = len(class_files)
