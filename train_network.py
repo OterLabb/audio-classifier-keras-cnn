@@ -18,10 +18,11 @@ import librosa.display
 
 from keras.models import Sequential, Model
 from keras.layers import Input, Dense, TimeDistributed, LSTM, Dropout, Activation
-from keras.layers import Convolution2D, MaxPooling2D, Flatten
+from keras.layers import Conv2D, MaxPooling2D, Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import ELU
 from keras.callbacks import ModelCheckpoint
+from keras.callbacks import TensorBoard
 from keras import backend
 from keras.utils import np_utils
 import os
@@ -31,12 +32,14 @@ from timeit import default_timer as timer
 
 mono=True
 
+# Added root folder to this model, for easier testing
+ROOT = "D:/BIRDS_SOUNDS/"
 
-def get_class_names(path="Preproc/"):  # class names are subdirectory names in Preproc/ directory
+def get_class_names(path=ROOT + "Preproc/"):  # class names are subdirectory names in Preproc/ directory
     class_names = os.listdir(path)
     return class_names
 
-def get_total_files(path="Preproc/",train_percentage=0.8): 
+def get_total_files(path=ROOT + "Preproc/",train_percentage=0.8): 
     sum_total = 0
     sum_train = 0
     sum_test = 0
@@ -51,7 +54,7 @@ def get_total_files(path="Preproc/",train_percentage=0.8):
         sum_test += n_test
     return sum_total, sum_train, sum_test
 
-def get_sample_dimensions(path='Preproc/'):
+def get_sample_dimensions(path=ROOT + 'Preproc/'):
     classname = os.listdir(path)[0]
     files = os.listdir(path+classname)
     infilename = files[0]
@@ -91,9 +94,9 @@ because we want to make sure statistics in training & testing are as similar as 
 '''
 def build_datasets(train_percentage=0.8, preproc=False):
     if (preproc):
-        path = "Preproc/"
+        path = ROOT + "Preproc/"
     else:
-        path = "Samples/"
+        path = ROOT + "Samples/"
 
     class_names = get_class_names(path=path)
     print("class_names = ",class_names)
@@ -173,14 +176,15 @@ def build_model(X,Y,nb_classes):
     input_shape = (1, X.shape[2], X.shape[3])
 
     model = Sequential()
-    model.add(Convolution2D(nb_filters, kernel_size[0], kernel_size[1],
-                        border_mode='valid', input_shape=input_shape))
+    model.add(Conv2D(nb_filters, kernel_size,
+                        padding='valid', input_shape=input_shape, data_format='channels_first'))
+    model.add(BatchNormalization(axis=1, momentum=1))
     model.add(BatchNormalization(axis=1, mode=2))
     model.add(Activation('relu'))
 
     for layer in range(nb_layers-1):
-        model.add(Convolution2D(nb_filters, kernel_size[0], kernel_size[1]))
-        model.add(BatchNormalization(axis=1, mode=2))
+        model.add(Conv2D(nb_filters, kernel_size))
+        model.add(BatchNormalization(axis=1, momentum=1))
         model.add(ELU(alpha=1.0))  
         model.add(MaxPooling2D(pool_size=pool_size))
         model.add(Dropout(0.25))
@@ -203,13 +207,13 @@ if __name__ == '__main__':
     # make the model
     model = build_model(X_train,Y_train, nb_classes=len(class_names))
     model.compile(loss='categorical_crossentropy',
-              optimizer='adadelta',
+              optimizer='adam',
               metrics=['accuracy'])
     model.summary()
 
     # Initialize weights using checkpoint if it exists. (Checkpointing requires h5py)
     load_checkpoint = True
-    checkpoint_filepath = 'weights.hdf5'
+    checkpoint_filepath = ROOT + 'weights.hdf5'
     if (load_checkpoint):
         print("Looking for previous weights...")
         if ( isfile(checkpoint_filepath) ):
@@ -220,14 +224,26 @@ if __name__ == '__main__':
     else:
         print('Starting from scratch (no checkpoint)')
     checkpointer = ModelCheckpoint(filepath=checkpoint_filepath, verbose=1, save_best_only=True)
-
+   
+    #Added tensorboard graphs
+    modelpath = ROOT + "Graph/"
+    if not os.path.exists(modelpath):
+        os.mkdir(modelpath );   # make a new directory model
+    tensorboard = TensorBoard(log_dir=ROOT + './Graph', histogram_freq=0,
+                                write_graph=True, write_images=True)
 
     # train and score the model
     batch_size = 128
-    nb_epoch = 100
+    nb_epoch = 10
     model.fit(X_train, Y_train, batch_size=batch_size, nb_epoch=nb_epoch,
           verbose=1, validation_data=(X_test, Y_test), callbacks=[checkpointer])
     score = model.evaluate(X_test, Y_test, verbose=0)
     print('Test score:', score[0])
     print('Test accuracy:', score[1])
+    
+    #Added model output as a .h5 file
+    modelpath = ROOT + "Model/"
+    if not os.path.exists(modelpath):
+        os.mkdir(modelpath );   # make a new directory model
 
+    model.save(modelpath + 'my_model.h5')
