@@ -18,7 +18,7 @@ import librosa.display
 
 from keras.models import Sequential, Model
 from keras.layers import Input, Dense, TimeDistributed, LSTM, Dropout, Activation
-from keras.layers import Convolution2D, MaxPooling2D, Flatten
+from keras.layers import Conv2D, MaxPooling2D, Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import ELU
 from keras.callbacks import ModelCheckpoint
@@ -33,12 +33,13 @@ from sklearn.metrics import roc_auc_score, roc_curve, auc
 
 mono=True
 
+ROOT = "D:/BIRDTEST/"
 
-def get_class_names(path="Preproc/"):  # class names are subdirectory names in Preproc/ directory
+def get_class_names(path=ROOT + "Preproc/"):  # class names are subdirectory names in Preproc/ directory
     class_names = os.listdir(path)
     return class_names
 
-def get_total_files(path="Preproc/",train_percentage=0.8): 
+def get_total_files(path=ROOT + "Preproc/",train_percentage=0.8):
     sum_total = 0
     sum_train = 0
     sum_test = 0
@@ -53,7 +54,7 @@ def get_total_files(path="Preproc/",train_percentage=0.8):
         sum_test += n_test
     return sum_total, sum_train, sum_test
 
-def get_sample_dimensions(path='Preproc/'):
+def get_sample_dimensions(path=ROOT + 'Preproc/'):
     classname = os.listdir(path)[0]
     files = os.listdir(path+classname)
     infilename = files[0]
@@ -96,9 +97,9 @@ def build_datasets(train_percentage=0.8, preproc=False):
     because we want to make sure statistics in training & testing are as similar as possible
     '''
     if (preproc):
-        path = "Preproc/"
+        path =ROOT + "Preproc/"
     else:
-        path = "Samples/"
+        path =ROOT + "Samples/"
 
     class_names = get_class_names(path=path)
     print("class_names = ",class_names)
@@ -176,14 +177,14 @@ def build_model(X,Y,nb_classes):
     input_shape = (1, X.shape[2], X.shape[3])
 
     model = Sequential()
-    model.add(Convolution2D(nb_filters, kernel_size[0], kernel_size[1],
-                        border_mode='valid', input_shape=input_shape))
-    model.add(BatchNormalization(axis=1, mode=2))
+    model.add(Conv2D(nb_filters, kernel_size,
+                     padding='valid', input_shape=input_shape, data_format='channels_first'))
+    model.add(BatchNormalization(axis=1, momentum=1))
     model.add(Activation('relu'))
 
     for layer in range(nb_layers-1):
-        model.add(Convolution2D(nb_filters, kernel_size[0], kernel_size[1]))
-        model.add(BatchNormalization(axis=1, mode=2))
+        model.add(Conv2D(nb_filters, kernel_size))
+        model.add(BatchNormalization(axis=1, momentum=1))
         model.add(ELU(alpha=1.0))  
         model.add(MaxPooling2D(pool_size=pool_size))
         model.add(Dropout(0.25))
@@ -206,12 +207,13 @@ if __name__ == '__main__':
     # make the model
     model = build_model(X_train,Y_train, nb_classes=len(class_names))
     model.compile(loss='categorical_crossentropy',
-              optimizer='adadelta',
-              metrics=['accuracy'])
+                  optimizer='adam',
+                  metrics=['accuracy'])
     model.summary()
 
     # Initialize weights using checkpoint if it exists. (Checkpointing requires h5py)
-    checkpoint_filepath = 'weights.hdf5'
+    weightpath = ROOT + "Weights/"
+    checkpoint_filepath = weightpath + 'weights.hdf5'
     if (True):
         print("Looking for previous weights...")
         if ( isfile(checkpoint_filepath) ):
